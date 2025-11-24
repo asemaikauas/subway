@@ -106,8 +106,8 @@ class Background:
             {"x": SCREEN_WIDTH, "width": SCREEN_WIDTH}
         ]
 
-    def update(self):
-        if not player.is_moving:
+    def update(self, is_moving):
+        if not is_moving:
             return
 
         for segment in self.city_segments:
@@ -142,40 +142,48 @@ class Background:
             for segment in self.track_segments:
                 image(self.lanes, segment["x"], 0)
 
-
+class Game:
+    def __init__(self):
+        jack_img = loadImage("jack.png")
+        bg_city_img = loadImage("bg_city.png")
+        background_img = loadImage("background.png")
+        lanes_img = loadImage("lanes.png")
+        
+        self.player = Player(jack_img)
+        self.background = Background(bg_city_img, lanes_img)
+    
+    def update(self):
+        self.background.update(self.player.is_moving)
+        self.player.update()
+    
+    def display(self):
+        self.background.draw()
+        self.player.draw()
+    
+    def handle_key(self, key_code, is_coded, is_space):
+        if is_coded:
+            if key_code == UP:
+                self.player.switch_lane("up")
+            elif key_code == DOWN:
+                self.player.switch_lane("down")
+        elif is_space:
+            self.player.toggle_pause()
 
 def setup():
-    global player, bg
-    global jack_img, bg_city_img, background_img, lanes_img
-    
+    global game
     size(SCREEN_WIDTH, SCREEN_HEIGHT)
     frameRate(60)
-    
-   
-    jack_img = loadImage("jack.png")
-    bg_city_img = loadImage("bg_city.png")
-    background_img = loadImage("background.png")
-    lanes_img = loadImage("lanes.png")
-    
-    player = Player(jack_img)
-    bg = Background(bg_city_img, lanes_img)
+    game = Game()
 
 def draw():
-    global player, bg
+    game.update()
+    game.display()
 
-    bg.update()
-    player.update()
-
-    bg.draw()
-    player.draw()
-
- 
 def keyPressed():
-    global player
     if key == CODED:
         if keyCode == UP:
-            player.switch_lane("up")
+            game.player.switch_lane("up")
         elif keyCode == DOWN:
-            player.switch_lane("down")
+            game.player.switch_lane("down")
     elif key == ' ':
-        player.toggle_pause()
+        game.player.toggle_pause()
