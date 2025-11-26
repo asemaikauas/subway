@@ -326,13 +326,13 @@ class CoinRow:
         self.x -= self.speed
         for c in self.coins:
             c.update_coin()
-        #if the row is fully off-screen --> remove
-        if self.coins[-1].x + self.coins[-1].w < 0:
-            if self.lane in self.game.taken_lanes:
-               self.game.taken_lanes.remove(self.lane)
-            self.game.COIN_ROWS.remove(self)
+        #if the row is fully off-screen and not fully collected --> remove
+        if len(self.coins) != 0:
+            if self.coins[-1].x + self.coins[-1].w < 0:
+                if self.lane in self.game.taken_lanes:
+                    self.game.taken_lanes.remove(self.lane)
+                    self.game.COIN_ROWS.remove(self)
 
-                
             
     def display(self):
         for c in self.coins:
@@ -341,6 +341,8 @@ class CoinRow:
             
 class Game:
     def __init__(self):
+        self.game_over = False
+        self.score = 0
         jack_img = loadImage(PATH + "/images/jack.png")
         background_img = loadImage(PATH + "/images/background.png")
         bg_city_img = loadImage(PATH + "/images/bg_city.png")
@@ -366,7 +368,13 @@ class Game:
             {"x": 620, "w": 314, "h": 149},   # train3
         ]
 
-
+    def check_player(self, obj):
+        # returns True if player hits an object
+        return (self.player.x < obj.x + obj.w and
+                self.player.x + self.player.sprite_width > obj.x and
+                self.player.y < obj.y + obj.h and
+                self.player.y + self.player.sprite_height > obj.y)
+                
     def check_collision(self, rect1, rect2):
         # returns True if two rectangles (objects) touch
         return (rect1.x < rect2.x + rect2.w and
@@ -467,9 +475,22 @@ class Game:
             self.taken_lanes.add(new_row.lane)
             return
                 
-    def update(self):
+    def update(self):        
         self.background.update(self.player.is_moving)
         self.player.update()
+        
+        for obs in self.OBSTACLES:
+            if obs.lane != self.player.current_lane:
+                continue
+            elif self.check_player(obs):
+                self.game_over = True
+        
+        for cr in self.COIN_ROWS:
+            for co in cr.coins:
+                if self.check_player(co):
+                    cr.coins.remove(co)
+                    self.score+=1
+        
         # always have 6 obstacles
         if len(self.OBSTACLES) < 6:
             self.spawn_obstacle()
@@ -491,6 +512,37 @@ class Game:
         self.OBSTACLES.sort(key=lambda obj: obj.y)
         for obj in self.OBSTACLES:
             obj.display()
+            
+        if self.game_over:
+            noLoop()
+            fill(0, 0, 0, 150)
+            noStroke()
+            rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+            textSize(32)
+            fill(255, 255, 255)
+            textAlign(CENTER, CENTER)
+            text('GAME OVER',SCREEN_WIDTH/2, SCREEN_HEIGHT/2-30)
+            textSize(24)
+            text('Score:' + ' ' + str(self.score), SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 20)
+            textSize(16)
+            text('Click to restart', SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 70)
+        else:
+            padding = 10
+            box_width = 80 + 8 * len(str(self.score))
+            box_height = 50
+            box_x = SCREEN_WIDTH - box_width - 20
+            box_y = 15
+            
+            fill(255, 255, 255, 200) 
+            noStroke()
+            rect(box_x, box_y, box_width, box_height, 10)
+            
+            image(self.coin_img, box_x + 10, box_y + 10, 30, 30, 0, 0, 30, 30)
+            
+            fill(0)
+            textSize(24)
+            textAlign(LEFT, CENTER)
+            text(str(self.score), box_x + 50, box_y + (box_height/2) - 3)
         
         
         
@@ -524,4 +576,10 @@ def keyPressed():
             game.player.switch_lane("down")
     elif key == ' ':
         game.player.toggle_pause()    
-    
+
+#if after the game is over mouse is clicked, new global game variable is created and loop of drawing is running again
+def mousePressed():
+    global game
+    if game.game_over:
+        game = Game()
+        loop()
