@@ -1,14 +1,17 @@
+import os
+
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 LANE_COUNT = 3
+PATH = os.getcwd()
 
 # fixed on left-center
 PLAYER_X = 250
 
 LANE_POSITIONS_Y = [
-    380,  # up
+    390,  # up
     518,  # mid
-    645   # down
+    635   # down
 ]
 
 class Player:
@@ -84,19 +87,26 @@ class Player:
         self.is_moving = not self.is_moving
 
 class Background:
-    def __init__(self, bg_city_img, lanes_img):
-        self.scroll_speed = 4
-        self.city_scroll_speed = 2
+    def __init__(self, background_img, bg_city_img, lanes_img):
+        self.bg_scroll_speed = 1        
+        self.city_scroll_speed = 2     
+        self.track_scroll_speed = 4     
 
+        self.bg_segments = []
         self.city_segments = []
         self.track_segments = []
 
+        self.background = background_img
         self.bg_city = bg_city_img
         self.lanes = lanes_img
 
         self.reset()
 
     def reset(self):
+        self.bg_segments = [
+            {"x": 0, "width": SCREEN_WIDTH},
+            {"x": SCREEN_WIDTH, "width": SCREEN_WIDTH}
+        ]
         self.city_segments = [
             {"x": 0, "width": SCREEN_WIDTH},
             {"x": SCREEN_WIDTH, "width": SCREEN_WIDTH}
@@ -110,14 +120,29 @@ class Background:
         if not is_moving:
             return
 
+        # Update far background layer (slowest)
+        for segment in self.bg_segments:
+            segment["x"] -= self.bg_scroll_speed
+
+        # Update city layer (medium speed)
         for segment in self.city_segments:
             segment["x"] -= self.city_scroll_speed
 
+        # Update track layer (fastest)
         for segment in self.track_segments:
-            segment["x"] -= self.scroll_speed
+            segment["x"] -= self.track_scroll_speed
 
+        # Remove off-screen segments and add new ones for seamless scrolling
+        self.bg_segments = [s for s in self.bg_segments if s["x"] + s["width"] > -50]
         self.city_segments = [s for s in self.city_segments if s["x"] + s["width"] > -50]
         self.track_segments = [s for s in self.track_segments if s["x"] + s["width"] > -50]
+
+        # Add new segments when needed
+        if len(self.bg_segments) > 0 and self.bg_segments[-1]["x"] + self.bg_segments[-1]["width"] < SCREEN_WIDTH + 50:
+            self.bg_segments.append({
+                "x": self.bg_segments[-1]["x"] + self.bg_segments[-1]["width"],
+                "width": SCREEN_WIDTH
+            })
 
         if len(self.city_segments) > 0 and self.city_segments[-1]["x"] + self.city_segments[-1]["width"] < SCREEN_WIDTH + 50:
             self.city_segments.append({
@@ -134,23 +159,31 @@ class Background:
     def draw(self):
         background(255)
         
+        # Draw layers from back to front for parallax effect
+        # Layer 1: Far background (slowest)
+        if self.background:
+            for segment in self.bg_segments:
+                image(self.background, segment["x"], 0)
+        
+        # Layer 2: City buildings (medium speed)
         if self.bg_city:
             for segment in self.city_segments:
                 image(self.bg_city, segment["x"], 0)
 
+        # Layer 3: Track/lanes (fastest)
         if self.lanes:
             for segment in self.track_segments:
                 image(self.lanes, segment["x"], 0)
 
 class Game:
     def __init__(self):
-        jack_img = loadImage("jack.png")
-        bg_city_img = loadImage("bg_city.png")
-        background_img = loadImage("background.png")
-        lanes_img = loadImage("lanes.png")
+        jack_img = loadImage(PATH + "/jack.png")
+        background_img = loadImage(PATH + "/background.png")
+        bg_city_img = loadImage(PATH + "/bg_city.png")
+        lanes_img = loadImage(PATH + "/lanes.png")
         
         self.player = Player(jack_img)
-        self.background = Background(bg_city_img, lanes_img)
+        self.background = Background(background_img, bg_city_img, lanes_img)
     
     def update(self):
         self.background.update(self.player.is_moving)
