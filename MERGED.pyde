@@ -256,7 +256,7 @@ class Train:
         self.type = ["train1", "train2", "train3"][self.num]
 
         self.img = self.game.train
-        self.speed = game.background.track_scroll_speed + 2
+        self.speed = game.background.track_scroll_speed + random.randint(2, 4)
 
         
 
@@ -369,11 +369,21 @@ class Game:
         ]
 
     def check_player(self, obj):
+        if obj.lane != self.player.target_lane:
+            return False
+        
+        padding = 15
+        
+        p_left = self.player.x + padding
+        p_right = self.player.x + self.player.sprite_width - padding
+        p_top = self.player.y + padding
+        p_bottom = self.player.y + self.player.sprite_height - padding
+        
         # returns True if player hits an object
-        return (self.player.x < obj.x + obj.w and
-                self.player.x + self.player.sprite_width > obj.x and
-                self.player.y < obj.y + obj.h and
-                self.player.y + self.player.sprite_height > obj.y)
+        return (p_left < obj.x + obj.w and
+                     p_right > obj.x and
+                     p_top < obj.y + obj.h and
+                     p_bottom > obj.y)
                 
     def check_collision(self, rect1, rect2):
         # returns True if two rectangles (objects) touch
@@ -480,7 +490,7 @@ class Game:
         self.player.update()
         
         for obs in self.OBSTACLES:
-            if obs.lane != self.player.current_lane:
+            if obs.lane != self.player.current_lane and obs.lane != self.player.target_lane and abs(self.player.target_lane-self.player.current_lane) != 1: 
                 continue
             elif self.check_player(obs):
                 self.game_over = True
