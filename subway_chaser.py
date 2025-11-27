@@ -14,60 +14,189 @@ LANE_POSITIONS_Y = [
     635   # down
 ]
 
+class AnimationConfig:
+
+    
+    SPRITE_IDLE = 0      
+    SPRITE_SLIDE = 1     
+    SPRITE_RUN = 2       
+    SPRITE_JUMP = 3     
+    SPRITE_FLY = 4    
+
+
+    JUMP_DURATION = 40        
+    SLIDE_DURATION = 40      
+    
+    JUMP_HEIGHT = 80          # vertical jump distance in pixels
+    
+    #  ADDD multiple frames
+    # for example a list of [2, 2, 3, 3]  
+    RUN_ANIMATION_FRAMES = [SPRITE_RUN]  
+    
+    RUN_ANIMATION_SPEED = 10   # higher = slower animation, lower = faster
+                               # 10 frames = sprite changes every 0.16 seconds
+    
+    CHARACTER_WIDTH = 51       # character width in pxs
+    CHARACTER_HEIGHT = 60      # character height in pxs
+
+
+class State:
+    IDLE = "IDLE"
+    RUNNING = "RUNNING"
+    JUMPING = "JUMPING"
+    SLIDING = "SLIDING"
+
 class Player:
     def __init__(self, sprite_img):
         self.x = PLAYER_X
         self.y = LANE_POSITIONS_Y[1]
+        self.base_y = LANE_POSITIONS_Y[1]  # for jump calculations
         self.target_lane = 1
         self.current_lane = 1
         self.velocity_x = 0
         self.velocity_y = 0
         self.speed_y = 15
-        self.is_moving = True
-
+        
+        self.game_started = False  
+        self.is_moving = False     
+        
         self.sprite_sheet = sprite_img
         self.sprite_width = 32
         self.sprite_height = 32
-        self.current_frame = 1
-        self.animation_counter = 0
-        self.animation_speed = 5
+        
+        self.state = State.IDLE
+        self.current_sprite_index = AnimationConfig.SPRITE_IDLE
+        
+        self.state_timer = 0         
+        self.animation_counter = 0     
+        self.run_frame_index = 0       
+        
+        self.jump_start_y = 0
+        self.is_jumping = False
+        
+        self.is_sliding = False
+    
+    def start_game(self):
+        if not self.game_started:
+            self.game_started = True
+            self.is_moving = True
+            self.change_state(State.RUNNING)
 
+    
+    def change_state(self, new_state):
+        if self.state == new_state:
+            return False
+        
+        if new_state == State.JUMPING:
+            if self.state != State.RUNNING:
+                return False  
+        
+        if new_state == State.SLIDING:
+            if self.state != State.RUNNING:
+                return False  
+        
+        if self.state == State.JUMPING:
+            self.is_jumping = False
+        elif self.state == State.SLIDING:
+            self.is_sliding = False
+        
+        self.state = new_state
+        self.state_timer = 0
+        
+        if new_state == State.IDLE:
+            self.current_sprite_index = AnimationConfig.SPRITE_IDLE
+        elif new_state == State.RUNNING:
+            self.current_sprite_index = AnimationConfig.SPRITE_RUN
+            self.run_frame_index = 0
+        elif new_state == State.JUMPING:
+            self.current_sprite_index = AnimationConfig.SPRITE_JUMP
+            self.is_jumping = True
+            self.jump_start_y = self.base_y
+        elif new_state == State.SLIDING:
+            self.current_sprite_index = AnimationConfig.SPRITE_SLIDE
+            self.is_sliding = True
+        
+        return True
+    
+    def jump(self):
+        return self.change_state(State.JUMPING)
+    
+    def slide(self):
+        return self.change_state(State.SLIDING)
+    
     def update(self):
-        if not self.is_moving:
+        self.state_timer += 1
+        
+        if self.state == State.IDLE:
+            self._update_idle()
+        elif self.state == State.RUNNING:
+            self._update_running()
+        elif self.state == State.JUMPING:
+            self._update_jumping()
+        elif self.state == State.SLIDING:
+            self._update_sliding()
+        
+        if self.is_moving:
+            self._update_lane_movement()
+    
+    def _update_idle(self):
+        pass
+    
+    def _update_running(self):
+        # please Update logic for running state"""
+        if len(AnimationConfig.RUN_ANIMATION_FRAMES) > 1:
+            self.animation_counter += 1
+            if self.animation_counter >= AnimationConfig.RUN_ANIMATION_SPEED:
+                self.animation_counter = 0
+                self.run_frame_index = (self.run_frame_index + 1) % len(AnimationConfig.RUN_ANIMATION_FRAMES)
+                self.current_sprite_index = AnimationConfig.RUN_ANIMATION_FRAMES[self.run_frame_index]
+    
+    def _update_jumping(self):
+        progress = float(self.state_timer) / AnimationConfig.JUMP_DURATION
+        
+        if progress >= 1.0:
+            self.y = self.base_y
+            self.change_state(State.RUNNING)
             return
-
+        
+        jump_offset = sin(progress * PI) * AnimationConfig.JUMP_HEIGHT
+        
+        self.y = self.base_y - jump_offset
+    
+    def _update_sliding(self):
+        if self.state_timer >= AnimationConfig.SLIDE_DURATION:
+            self.change_state(State.RUNNING)
+    
+    def _update_lane_movement(self):
         target_y = LANE_POSITIONS_Y[self.target_lane]
-        distance = target_y - self.y
-
+        distance = target_y - self.base_y
+        
         if abs(distance) > 2:
             self.velocity_y = distance * 0.3
-            self.y += self.velocity_y
+            self.base_y += self.velocity_y
         else:
-            self.y = target_y
+            self.base_y = target_y
             self.velocity_y = 0
             self.current_lane = self.target_lane
-
-        self.animation_counter += 1
-        if self.animation_counter >= self.animation_speed:
-            self.animation_counter = 0
-            self.current_frame += 1
-            if self.current_frame > 3:
-                self.current_frame = 1
-
+        
+        # If not jumping, sync display Y with base Y
+        if self.state != State.JUMPING:
+            self.y = self.base_y
+    
     def draw(self):
         if self.sprite_sheet:
             sheet_width = self.sprite_sheet.width
             sheet_height = self.sprite_sheet.height
             frame_width = sheet_width / 5
             
-            frame_x = self.current_frame * frame_width
+            frame_x = self.current_sprite_index * frame_width
             
             pushMatrix()
             imageMode(CENTER)
             translate(self.x, self.y)
             
             img_copy = self.sprite_sheet.get(int(frame_x), 0, int(frame_width), int(sheet_height))
-            image(img_copy, 0, 0, 60, 60)
+            image(img_copy, 0, 0, AnimationConfig.CHARACTER_WIDTH, AnimationConfig.CHARACTER_HEIGHT)
             
             imageMode(CORNER)
             popMatrix()
@@ -76,15 +205,15 @@ class Player:
             ellipse(self.x, self.y - 20, 40, 40)
             fill(100, 150, 255)
             rect(self.x - 10, self.y - 10, 20, 30)
-
+    
     def switch_lane(self, direction):
+        if not self.is_moving:
+            return
+        
         if direction == "up" and self.target_lane > 0:
             self.target_lane -= 1
         elif direction == "down" and self.target_lane < LANE_COUNT - 1:
             self.target_lane += 1
-
-    def toggle_pause(self):
-        self.is_moving = not self.is_moving
 
 class Background:
     def __init__(self, background_img, bg_city_img, lanes_img):
@@ -184,14 +313,23 @@ class Game:
         self.background.draw()
         self.player.draw()
     
-    def handle_key(self, key_code, is_coded, is_space):
-        if is_coded:
-            if key_code == UP:
+    def mouse_click(self):
+        self.player.start_game()
+    
+    def key_press(self):
+        if key == CODED:
+            if keyCode == UP:
                 self.player.switch_lane("up")
-            elif key_code == DOWN:
+            elif keyCode == DOWN:
                 self.player.switch_lane("down")
-        elif is_space:
-            self.player.toggle_pause()
+            # Slide (Control key)
+            elif keyCode == CONTROL:
+                if self.player.game_started:
+                    self.player.slide()
+        
+        elif key == ' ':
+            if self.player.game_started:
+                self.player.jump()
 
 def setup():
     global game
@@ -204,10 +342,7 @@ def draw():
     game.display()
 
 def keyPressed():
-    if key == CODED:
-        if keyCode == UP:
-            game.player.switch_lane("up")
-        elif keyCode == DOWN:
-            game.player.switch_lane("down")
-    elif key == ' ':
-        game.player.toggle_pause()
+    game.key_press()
+
+def mousePressed():
+    game.mouse_click()
