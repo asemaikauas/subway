@@ -15,30 +15,35 @@ LANE_POSITIONS_Y = [
 ]
 
 class AnimationConfig:
-
+  
     
     SPRITE_IDLE = 0      
     SPRITE_SLIDE = 1     
-    SPRITE_RUN = 2       
-    SPRITE_JUMP = 3     
-    SPRITE_FLY = 4    
-
-
-    JUMP_DURATION = 40        
-    SLIDE_DURATION = 40      
+    SPRITE_RUN = 2      
+    SPRITE_JUMP = 3      
+    SPRITE_FLYING = 4    
     
-    JUMP_HEIGHT = 80          # vertical jump distance in pixels
     
-    #  ADDD multiple frames
-    # for example a list of [2, 2, 3, 3]  
+    SPRITE_COORDINATES = {
+        0: (0, 0, 160, 280),        
+        1: (190, 0, 170, 280),      
+        2: (408, 0, 170, 280),      
+        3: (612, 0, 170, 280),     
+        4: (816, 0, 204, 280),     
+    }
+    
+
+    JUMP_DURATION = 30        
+    SLIDE_DURATION = 36      
+    
+    JUMP_HEIGHT = 80          
+                    
     RUN_ANIMATION_FRAMES = [SPRITE_RUN]  
     
-    RUN_ANIMATION_SPEED = 10   # higher = slower animation, lower = faster
-                               # 10 frames = sprite changes every 0.16 seconds
-    
-    CHARACTER_WIDTH = 51       # character width in pxs
-    CHARACTER_HEIGHT = 60      # character height in pxs
-
+    RUN_ANIMATION_SPEED = 10   
+    CHARACTER_WIDTH = 60       
+    CHARACTER_HEIGHT = 60     
+                               
 
 class State:
     IDLE = "IDLE"
@@ -50,15 +55,15 @@ class Player:
     def __init__(self, sprite_img):
         self.x = PLAYER_X
         self.y = LANE_POSITIONS_Y[1]
-        self.base_y = LANE_POSITIONS_Y[1]  # for jump calculations
+        self.base_y = LANE_POSITIONS_Y[1]  
         self.target_lane = 1
         self.current_lane = 1
         self.velocity_x = 0
         self.velocity_y = 0
         self.speed_y = 15
         
-        self.game_started = False  
-        self.is_moving = False     
+        self.game_started = False 
+        self.is_moving = False    
         
         self.sprite_sheet = sprite_img
         self.sprite_width = 32
@@ -67,8 +72,8 @@ class Player:
         self.state = State.IDLE
         self.current_sprite_index = AnimationConfig.SPRITE_IDLE
         
-        self.state_timer = 0         
-        self.animation_counter = 0     
+        self.state_timer = 0          
+        self.animation_counter = 0    
         self.run_frame_index = 0       
         
         self.jump_start_y = 0
@@ -81,7 +86,7 @@ class Player:
             self.game_started = True
             self.is_moving = True
             self.change_state(State.RUNNING)
-
+    
     
     def change_state(self, new_state):
         if self.state == new_state:
@@ -89,7 +94,7 @@ class Player:
         
         if new_state == State.JUMPING:
             if self.state != State.RUNNING:
-                return False  
+                return False 
         
         if new_state == State.SLIDING:
             if self.state != State.RUNNING:
@@ -143,7 +148,6 @@ class Player:
         pass
     
     def _update_running(self):
-        # please Update logic for running state"""
         if len(AnimationConfig.RUN_ANIMATION_FRAMES) > 1:
             self.animation_counter += 1
             if self.animation_counter >= AnimationConfig.RUN_ANIMATION_SPEED:
@@ -187,20 +191,33 @@ class Player:
         if self.sprite_sheet:
             sheet_width = self.sprite_sheet.width
             sheet_height = self.sprite_sheet.height
-            frame_width = sheet_width / 5
             
-            frame_x = self.current_sprite_index * frame_width
-            
+            if AnimationConfig.SPRITE_COORDINATES is not None:
+                coords = AnimationConfig.SPRITE_COORDINATES[self.current_sprite_index]
+                
+                if len(coords) == 2:
+                    frame_x, frame_width = coords
+                    frame_y = 0
+                    frame_height = sheet_height
+                else:  # len(coords) == 4
+                    frame_x, frame_y, frame_width, frame_height = coords
+            else:
+                frame_width = sheet_width // 5
+                frame_x = self.current_sprite_index * frame_width
+                frame_y = 0
+                frame_height = sheet_height
+                        
             pushMatrix()
             imageMode(CENTER)
             translate(self.x, self.y)
             
-            img_copy = self.sprite_sheet.get(int(frame_x), 0, int(frame_width), int(sheet_height))
+            img_copy = self.sprite_sheet.get(frame_x, frame_y, frame_width, frame_height)
             image(img_copy, 0, 0, AnimationConfig.CHARACTER_WIDTH, AnimationConfig.CHARACTER_HEIGHT)
             
             imageMode(CORNER)
             popMatrix()
         else:
+            # Fallback drawing if no sprite sheet
             fill(255, 100, 100)
             ellipse(self.x, self.y - 20, 40, 40)
             fill(100, 150, 255)
@@ -314,6 +331,7 @@ class Game:
         self.player.draw()
     
     def mouse_click(self):
+        """Handle mouse click to start game"""
         self.player.start_game()
     
     def key_press(self):
@@ -322,7 +340,6 @@ class Game:
                 self.player.switch_lane("up")
             elif keyCode == DOWN:
                 self.player.switch_lane("down")
-            # Slide (Control key)
             elif keyCode == CONTROL:
                 if self.player.game_started:
                     self.player.slide()
