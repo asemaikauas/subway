@@ -445,7 +445,7 @@ class Game:
         return True
 
     def spawn_obstacle(self):
-        for _ in range(10): # try 10 times to find valid position
+        for _ in range(8): # try 10 times to find valid position
             start_x = random.randint(SCREEN_WIDTH + 50, SCREEN_WIDTH + 800)
             
             # choose type
@@ -518,6 +518,7 @@ class Game:
         self.player.draw()
         for row in self.COIN_ROWS:
             row.display()
+            
         #objects should be higher than coins and if anything --> cover them
         self.OBSTACLES.sort(key=lambda obj: obj.y)
         for obj in self.OBSTACLES:
@@ -593,3 +594,4 @@ def mousePressed():
     if game.game_over:
         game = Game()
         loop()
+
