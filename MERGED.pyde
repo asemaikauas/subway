@@ -46,7 +46,7 @@ class AnimationConfig:
 
     SLIDE_DURATION = 70
     RUN_ANIMATION_FRAMES = [1, 2]  # cycle between run1 and run2
-    RUN_ANIMATION_SPEED = 8
+    RUN_ANIMATION_SPEED = 7
     CHARACTER_WIDTH = 60
     CHARACTER_HEIGHT = 60
 
@@ -211,7 +211,6 @@ class Player:
         pass
 
     def _update_running(self):
-        if len(AnimationConfig.RUN_ANIMATION_FRAMES) > 1:
             self.animation_counter += 1
             if self.animation_counter >= AnimationConfig.RUN_ANIMATION_SPEED:
                 self.animation_counter = 0
@@ -593,6 +592,7 @@ class Game:
         self.bg_sound = player.loadFile(PATH + '/sounds/bg_sound.mp3') 
         self.death_sound = player.loadFile(PATH + '/sounds/death_sound.mp3') 
         self.coin_sound = player.loadFile(PATH + '/sounds/coin.mp3')
+        self.power_sound = player.loadFile(PATH + '/sounds/powerUp.mp3') 
         self.bg_sound.loop()
 
         self.OBSTACLES = []
@@ -861,6 +861,8 @@ class Game:
                 continue
             
             if self.check_player(pu):
+                self.power_sound.rewind()
+                self.power_sound.play()
                 if pu.type == 'doublejump':
                     self.player.super_jump()
                 if pu in self.POWER_UPS:
@@ -970,9 +972,9 @@ def keyPressed():
 def mousePressed():
     global game
     if game.game_over:
-        # Close old sounds to free memory before creating new game
         game.bg_sound.close()
         game.death_sound.close()
         game.coin_sound.close()
+        game.power_sound.close()
         game = Game()
         loop()
