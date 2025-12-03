@@ -930,7 +930,7 @@ class Game:
             
             # tint to see when the powerup is active
             if self.player.powerup_active:
-                tint(0, 160, 50)
+                tint(144, 238, 240)
             else:
                 noTint()
             fill(255, 255, 255, 200)
@@ -978,3 +978,4 @@ def mousePressed():
         game.power_sound.close()
         game = Game()
         loop()
+
