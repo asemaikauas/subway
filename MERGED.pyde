@@ -29,20 +29,24 @@ LANE_POSITIONS_Y = [
 
 class AnimationConfig:
     SPRITE_IDLE = 0
-    SPRITE_SLIDE = 1
-    SPRITE_RUN = 2
+    SPRITE_RUN1 = 1
+    SPRITE_RUN2 = 2
     SPRITE_JUMP = 3
+    SPRITE_SLIDE = 4
+    SPRITE_FLY = 5
 
     SPRITE_COORDINATES = {
-        0: (0, 0, 160, 280),
-        1: (190, 0, 170, 280),
-        2: (408, 0, 170, 280),
-        3: (612, 0, 170, 280),
+        0: (0, 0, 19, 40),     # idle
+        1: (19, 0, 27, 40),    # run1
+        2: (45, 0, 30, 40),    # run2 
+        3: (75, 0, 24, 40),    # jump 
+        4: (99, 0, 28, 40),    # slide 
+        5: (128, 0, 36, 40),   # flying (for later)
     }
 
     SLIDE_DURATION = 70
-    RUN_ANIMATION_FRAMES = [SPRITE_RUN]
-    RUN_ANIMATION_SPEED = 10
+    RUN_ANIMATION_FRAMES = [1, 2]  # cycle between run1 and run2
+    RUN_ANIMATION_SPEED = 8
     CHARACTER_WIDTH = 60
     CHARACTER_HEIGHT = 60
 
@@ -85,7 +89,7 @@ class Player:
         self.sprite_height = AnimationConfig.CHARACTER_HEIGHT
 
         self.state = State.RUNNING
-        self.current_sprite_index = AnimationConfig.SPRITE_RUN
+        self.current_sprite_index = AnimationConfig.SPRITE_RUN1
 
         self.state_timer = 0
         self.animation_counter = 0
@@ -119,7 +123,7 @@ class Player:
         if new_state == State.IDLE:
             self.current_sprite_index = AnimationConfig.SPRITE_IDLE
         elif new_state == State.RUNNING:
-            self.current_sprite_index = AnimationConfig.SPRITE_RUN
+            self.current_sprite_index = AnimationConfig.SPRITE_RUN1
             self.run_frame_index = 0
         elif new_state == State.JUMPING:
             self.current_sprite_index = AnimationConfig.SPRITE_JUMP
@@ -572,7 +576,7 @@ class Game:
 
         # image loads
         
-        jack_img = loadImage(PATH + "/images/jack.png") if os.path.exists(PATH + "/images/jack.png") else None
+        jack_img = loadImage(PATH + "/images/jack_new.png") if os.path.exists(PATH + "/images/jack_new.png") else None
         background_img = loadImage(PATH + "/images/background.png") if os.path.exists(PATH + "/images/background.png") else None
         bg_city_img = loadImage(PATH + "/images/bg_city.png") if os.path.exists(PATH + "/images/bg_city.png") else None
         lanes_img = loadImage(PATH + "/images/lanes.png") if os.path.exists(PATH + "/images/lanes.png") else None
@@ -966,6 +970,7 @@ def keyPressed():
 def mousePressed():
     global game
     if game.game_over:
+        # Close old sounds to free memory before creating new game
         game.bg_sound.close()
         game.death_sound.close()
         game.coin_sound.close()
