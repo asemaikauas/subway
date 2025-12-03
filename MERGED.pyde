@@ -1,9 +1,13 @@
+add_library('minim')
+
 import time
 import os
 import random
 
 
 PATH = os.getcwd()
+player = Minim(this)
+
 
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
@@ -580,6 +584,12 @@ class Game:
         self.obs = loadImage(PATH + '/images/obstacles.png') if os.path.exists(PATH + '/images/obstacles.png') else None
         self.coin_img = loadImage(PATH + '/images/coins.png') if os.path.exists(PATH + '/images/coins.png') else None
         self.powerups = loadImage(PATH + '/images/powerups.png') 
+        
+        # sounds 
+        self.bg_sound = player.loadFile(PATH + '/sounds/bg_sound.mp3') 
+        self.death_sound = player.loadFile(PATH + '/sounds/death_sound.mp3') 
+        self.coin_sound = player.loadFile(PATH + '/sounds/coin.mp3')
+        self.bg_sound.loop()
 
         self.OBSTACLES = []
         self.COIN_ROWS = []
@@ -823,7 +833,9 @@ class Game:
                 continue
             if self.check_player(obs):
                 self.game_over = True
-            
+                self.bg_sound.pause()
+                self.death_sound.rewind()
+                self.death_sound.play()
                 break
 
         # coins collection
@@ -835,6 +847,8 @@ class Game:
                     except ValueError:
                         pass
                     self.score += 1
+                    self.coin_sound.rewind()
+                    self.coin_sound.play()
                         
         # power-ups collection
         for pu in list(self.POWER_UPS):            
@@ -926,7 +940,7 @@ class Game:
             text(str(self.score), box_x + 50, box_y + (box_height/2) - 3)
 
 # global game
-game = Game()
+game = None
 
 def setup():
     global game
@@ -952,5 +966,8 @@ def keyPressed():
 def mousePressed():
     global game
     if game.game_over:
+        game.bg_sound.close()
+        game.death_sound.close()
+        game.coin_sound.close()
         game = Game()
         loop()
