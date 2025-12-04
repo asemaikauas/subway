@@ -27,26 +27,35 @@ LANE_POSITIONS_Y = [
     665   # down
 ]
 
+# Air lanes for flying powerup
+AIR_LANE_POSITIONS_Y = [
+    100,  # up
+    180,  # mid
+    260   # down
+]
+
 class AnimationConfig:
-    SPRITE_IDLE = 0
-    SPRITE_RUN1 = 1
-    SPRITE_RUN2 = 2
-    SPRITE_JUMP = 3
-    SPRITE_SLIDE = 4
-    SPRITE_FLY = 5
+    SPRITE_RUN1 = 0
+    SPRITE_RUN2 = 1
+    SPRITE_RUN3 = 2
+    SPRITE_RUN4 = 3
+    SPRITE_JUMP = 4
+    SPRITE_SLIDE = 5
+    SPRITE_FLY = 6
 
     SPRITE_COORDINATES = {
-        0: (0, 0, 19, 40),     # idle
-        1: (19, 0, 27, 40),    # run1
-        2: (45, 0, 30, 40),    # run2 
-        3: (75, 0, 24, 40),    # jump 
-        4: (99, 0, 28, 40),    # slide 
-        5: (128, 0, 36, 40),   # flying (for later)
+        0: (0, 0, 27, 40),     # run0
+        1: (27, 0, 25, 40),    # run1
+        2: (52, 0, 27, 40),    # run2 
+        3: (84, 0, 24, 40),    # run3 
+        4: (109, 0, 24, 40),    # jump 
+        5: (136, 0, 28, 40),   # slide
+        6: (165, 0, 37, 40),   # flying
     }
 
     SLIDE_DURATION = 70
-    RUN_ANIMATION_FRAMES = [1, 2]  # cycle between run1 and run2
-    RUN_ANIMATION_SPEED = 7
+    RUN_ANIMATION_FRAMES = [0, 1, 2, 3]  # cycle between run1 and run2
+    RUN_ANIMATION_SPEED = 9
     CHARACTER_WIDTH = 60
     CHARACTER_HEIGHT = 60
 
@@ -98,6 +107,11 @@ class Player:
         self.is_jumping = False
         self.is_on_ground = True
         self.is_sliding = False
+        self.is_flying = False
+        self.air_lane = 1  # track which air lane when flying
+        
+        self.invincible = False
+        self.invincible_end_time = 0
 
     def change_state(self, new_state):
         if self.state == new_state:
@@ -172,8 +186,20 @@ class Player:
     def super_jump(self):
         self.powerup_active = True
         self.JUMP_FORCE = self.SUPER_JUMP_FORCE
-        
+        # 8-15 seconds in milliseconds
         self.powerup_end_time = millis() + 10000 # 10 seconds
+    
+    def fly(self):
+        self.is_flying = True
+        self.powerup_active = True
+
+        self.powerup_end_time = millis() + random.randint(8000, 15000)
+        self.air_lane = 1  # start in middle air lane
+        self.current_sprite_index = AnimationConfig.SPRITE_FLY
+        # Move player to air lane position
+        self.y = AIR_LANE_POSITIONS_Y[self.air_lane]
+        self.base_y = AIR_LANE_POSITIONS_Y[self.air_lane]
+        self.is_on_ground = False
     
 
     def _update_lane_movement(self):
@@ -226,15 +252,48 @@ class Player:
         if self.state_timer >= AnimationConfig.SLIDE_DURATION:
             self.change_state(State.RUNNING)
 
+    def _update_flying(self):
+        self.current_sprite_index = AnimationConfig.SPRITE_FLY
+        target_y = AIR_LANE_POSITIONS_Y[self.air_lane]
+        distance = target_y - self.y
+        
+        if abs(distance) > 2:
+            self.y += distance * 0.2  # smooth interpolation
+        else:
+            self.y = target_y
+            self.base_y = target_y
+
     def update(self):
         if not self.is_moving:
             return
         
-        if self.powerup_active and millis() > self.powerup_end_time:
+        if self.powerup_active and millis() >= self.powerup_end_time:
             self.powerup_active = False
+            # end flying if active
+            if self.is_flying:
+                self.is_flying = False
+                # Return to ground lane matching the air lane position
+                self.current_lane = self.air_lane
+                self.target_lane = self.air_lane
+                self.base_y = LANE_POSITIONS_Y_JACK[self.air_lane]
+                self.y = self.base_y
+                self.is_on_ground = True
+                self.change_state(State.RUNNING)
+                # Brief invincibility after landing ( seconds)
+                self.invincible = True
+                self.invincible_end_time = millis() + 2000
+            
+        # End invincibility when time is up
+        if self.invincible and millis() >= self.invincible_end_time:
+            self.invincible = False
             
         if not self.powerup_active:
             self.JUMP_FORCE = self.NORMAL_JUMP_FORCE
+
+        # If flying, handle air movement instead of normal states
+        if self.is_flying:
+            self._update_flying()
+            return
 
         self.state_timer += 1
 
@@ -323,6 +382,15 @@ class Player:
     def switch_lane(self, direction):
         if not self.is_moving:
             return
+        
+        # If flying, switch air lanes instead
+        if self.is_flying:
+            if direction == "up" and self.air_lane > 0:
+                self.air_lane -= 1
+            elif direction == "down" and self.air_lane < LANE_COUNT - 1:
+                self.air_lane += 1
+            return
+        
         if direction == "up" and self.target_lane > 0:
             self.target_lane -= 1
         elif direction == "down" and self.target_lane < LANE_COUNT - 1:
@@ -475,6 +543,7 @@ class Coin:
         self.slices = 4
         self.slice = 0
         self.speed = game.background.track_scroll_speed
+        self.is_air = False  # Default to ground coin
 
         self.w = 30
         self.h = 30
@@ -492,7 +561,7 @@ class Coin:
         image(self.img, self.x, self.y, self.w, self.h, src_x, 0, src_x + self.w, self.h)
 
 class CoinRow:
-    def __init__(self, x, lane, game):
+    def __init__(self, x, lane, game, is_air=False):
         self.game = game
         self.x = x
         self.lane = lane
@@ -503,15 +572,20 @@ class CoinRow:
         self.w = (self.count * self.coin_w) + (self.space * (self.count - 1))
 
         self.type = 'coinrow'
+        self.is_air = is_air
         self.speed = game.background.track_scroll_speed
         self.h = 30
 
-        self.y = LANE_POSITIONS_Y[lane] - self.h
+        if is_air:
+            self.y = AIR_LANE_POSITIONS_Y[lane] - self.h
+        else:
+            self.y = LANE_POSITIONS_Y[lane] - self.h
 
         for i in range(self.count):
             c = Coin(self.x + i * self.space, game)
             c.lane = lane
             c.y = self.y
+            c.is_air = is_air  # Pass air flag to each coin
             self.coins.append(c)
 
     def update(self):
@@ -575,17 +649,17 @@ class Game:
 
         # image loads
         
-        jack_img = loadImage(PATH + "/images/jack_new.png") if os.path.exists(PATH + "/images/jack_new.png") else None
-        background_img = loadImage(PATH + "/images/background.png") if os.path.exists(PATH + "/images/background.png") else None
-        bg_city_img = loadImage(PATH + "/images/bg_city.png") if os.path.exists(PATH + "/images/bg_city.png") else None
-        lanes_img = loadImage(PATH + "/images/lanes.png") if os.path.exists(PATH + "/images/lanes.png") else None
+        jack_img = loadImage(PATH + "/images/last_try.png") 
+        background_img = loadImage(PATH + "/images/background.png") 
+        bg_city_img = loadImage(PATH + "/images/bg_city.png") 
+        lanes_img = loadImage(PATH + "/images/lanes.png") 
 
         self.player = Player(jack_img, self)
         self.background = Background(background_img, bg_city_img, lanes_img)
 
-        self.train = loadImage(PATH + '/images/trains.png') if os.path.exists(PATH + '/images/trains.png') else None
-        self.obs = loadImage(PATH + '/images/obstacles.png') if os.path.exists(PATH + '/images/obstacles.png') else None
-        self.coin_img = loadImage(PATH + '/images/coins.png') if os.path.exists(PATH + '/images/coins.png') else None
+        self.train = loadImage(PATH + '/images/trains.png') 
+        self.obs = loadImage(PATH + '/images/obstacles.png') 
+        self.coin_img = loadImage(PATH + '/images/coins.png') 
         self.powerups = loadImage(PATH + '/images/powerups.png') 
         
         # sounds 
@@ -621,9 +695,18 @@ class Game:
         ]
 
     def check_player(self, obj):
-        # ignore different lanes
-        if obj.lane not in (self.player.current_lane, self.player.target_lane):
+        # Invincible: skip obstacles but still collect coins
+        if self.player.invincible and obj.type not in ('coin', 'coinrow'):
             return False
+            
+        if self.player.is_flying:
+            # flying - collect air coins in matching air lane
+            is_valid_air_coin = obj.type in ('coin', 'coinrow') and obj.is_air and obj.lane == self.player.air_lane
+            if not is_valid_air_coin:
+                return False
+        else:
+            if obj.lane not in (self.player.current_lane, self.player.target_lane):
+                return False
 
         padding = 15
         p_left = self.player.x - self.player.sprite_width/2 + padding
@@ -826,6 +909,25 @@ class Game:
                 self.POWER_UPS.append(new_pu)
                 return
 
+    def spawn_air_coinrow(self):
+        """Spawn coin rows in air lanes while flying"""
+        if not self.player.is_flying:
+            return
+        attempts = 4
+        for _ in range(attempts):
+            lane = random.randint(0, LANE_COUNT - 1)
+            start_x = random.randint(SCREEN_WIDTH + 100, SCREEN_WIDTH + 500)
+            
+            new_row = CoinRow(start_x, lane, self, is_air=True)
+            
+            # Check against other air coins only (ground coins are far below)
+            air_rows = [r for r in self.COIN_ROWS if r.is_air]
+            if not self.is_space_free(new_row, air_rows, is_coin_check=True):
+                continue
+            
+            self.COIN_ROWS.append(new_row)
+            return
+
     def update(self):
         self.background.update(self.player.is_moving)
         self.player.update()
@@ -856,7 +958,7 @@ class Game:
                         
         # power-ups collection
         for pu in list(self.POWER_UPS):            
-            if pu.x + pu.w <0:
+            if pu.x + pu.w < 0:
                 self.POWER_UPS.remove(pu)
                 continue
             
@@ -865,6 +967,8 @@ class Game:
                 self.power_sound.play()
                 if pu.type == 'doublejump':
                     self.player.super_jump()
+                elif pu.type == 'flying':
+                    self.player.fly()
                 if pu in self.POWER_UPS:
                     self.POWER_UPS.remove(pu)
 
@@ -885,6 +989,18 @@ class Game:
             self.spawn_powerup()
         for pu in list(self.POWER_UPS):
             pu.update()
+        
+        # spawn air coins while flying
+        if self.player.is_flying:
+            air_coin_count = sum(1 for r in self.COIN_ROWS if r.is_air)
+            if air_coin_count < 3:
+                self.spawn_air_coinrow()
+        
+        # Remove air coin rows when flying ends
+        if not self.player.is_flying:
+            for row in list(self.COIN_ROWS):
+                if row.is_air:
+                    self.COIN_ROWS.remove(row)
 
     def display(self):
         self.background.draw()
@@ -930,7 +1046,7 @@ class Game:
             
             # tint to see when the powerup is active
             if self.player.powerup_active:
-                tint(144, 238, 240)
+                tint(0, 160, 50)
             else:
                 noTint()
             fill(255, 255, 255, 200)
@@ -978,4 +1094,3 @@ def mousePressed():
         game.power_sound.close()
         game = Game()
         loop()
-
