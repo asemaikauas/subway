@@ -281,7 +281,7 @@ class Player:
                 self.change_state(State.RUNNING)
                 # Brief invincibility after landing ( seconds)
                 self.invincible = True
-                self.invincible_end_time = millis() + 2000
+                self.invincible_end_time = millis() + 3000
             
         # End invincibility when time is up
         if self.invincible and millis() >= self.invincible_end_time:
@@ -676,6 +676,8 @@ class Game:
 
         self.last_train = None
         self.powerups_count = 0
+        self.last_powerup_time = 0  # Track last powerup spawn/collection time
+        self.powerup_cooldown = 20000  # 20 seconds cooldown between power-ups
 
         self.OBSTACLE_SPRITES = [
             {"x": 0,   "w": 107, "h": 100},  # fence
@@ -886,7 +888,11 @@ class Game:
             return
         
     def spawn_powerup(self):
-        if random.random() < 0.005: # 0.5% chance per frame
+        # Check cooldown - don't spawn if not enough time has passed
+        if millis() - self.last_powerup_time < self.powerup_cooldown:
+            return
+            
+        if random.random() < 0.003:  # 0.3% chance per frame
             attempts = 3
             for _ in range(attempts):
                 lane = random.randint(0, LANE_COUNT - 1)
@@ -907,6 +913,7 @@ class Game:
                     continue
 
                 self.POWER_UPS.append(new_pu)
+                self.last_powerup_time = millis()  # Record spawn time
                 return
 
     def spawn_air_coinrow(self):
@@ -969,6 +976,7 @@ class Game:
             if self.check_player(pu):
                 self.power_sound.rewind()
                 self.power_sound.play()
+                self.last_powerup_time = millis()  # Reset cooldown on collection
                 if pu.type == 'doublejump':
                     self.player.super_jump()
                 elif pu.type == 'flying':
