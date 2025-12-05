@@ -464,11 +464,13 @@ class Train:
         self.lane = random.randint(0, LANE_COUNT - 1)
         self.y = LANE_POSITIONS_Y[self.lane] - self.h
 
+        # different types for image loading
         self.type = ["train1", "train2", "train3"][self.num]
 
         self.img = self.game.train
         self.speed = game.background.track_scroll_speed + random.randint(1, 2)
 
+    # update Obstacles list when out of the screen and move trains
     def update(self):
         self.x -= self.speed
         if self.x + self.w <= 0:
@@ -559,7 +561,6 @@ class CoinRow:
 
 
 # CLASS POWER UPS: initializing, updating, displaying work for all powerups
-# in order to implement flying has to work with other class and/or add it as function in this class
 class PowerUP:
     def __init__(self, x, lane, game):
         self.game = game
@@ -665,12 +666,13 @@ class Game:
         p_top = self.player.y - self.player.sprite_height/2 + padding
         p_bottom = self.player.y + self.player.sprite_height/2 - padding
 
-        # coins: collect, but not lethal
+        # coins: collect, but not die
         if obj_type in ("coin", "coinrow"):
             return (p_left < obj.x + obj.w and
                     p_right > obj.x and
                     p_top < obj.y + obj.h and
                     p_bottom > obj.y)
+
         #powerups: collect and use
         if obj_type in ('flying', 'doublejump'):
             return (p_left < obj.x + obj.w and
@@ -685,18 +687,18 @@ class Game:
             train_left = obj.x
             train_right = obj.x + obj.w
 
-            # 1. Check if we are jumping OUT of the train
-            # If colliding but moving UP, we are jumping off. Safe.
+            # check if jumping out of the train
+            # if colliding but moving UP => jumping off
             is_touching = (p_left < train_right and p_right > train_left and 
                            p_top < obj.y + obj.h and p_bottom > obj.y)
             
             if is_touching and self.player.velocity_y < 0:
                 return False
 
-            # 2. Check Landing
+            # check Landing
             horizontally_over = (p_right > train_left and p_left < train_right)
             falling_down = self.player.velocity_y >= 0
-            # Allow feet to be slightly below top (tolerance)
+            # Allow feet to be slightly below top
             within_landing = (feet >= train_top - 5 and feet <= train_top + 5)
 
             if horizontally_over and falling_down and within_landing:
@@ -704,19 +706,18 @@ class Game:
                 self.player.is_on_ground = True
                 self.player.velocity_y = 0
                 
-                # --- VISUAL FIX ---
-                # Lift base_y by half height (30px) so feet sit ON top, not waist.
+                # Lift base_y by half height (30px) so Jack is visually on top of the train
                 self.player.base_y = train_top - 30
                 self.player.y = self.player.base_y 
                 
                 self.last_train = obj
                 return False
 
-            # If we are already riding this train, ignore collision
+            # If already riding this train, ignore collision
             if self.player.on_train:
                 return False
 
-        # --- GENERAL COLLISION (Death) ---
+        # general collision
         is_colliding = (p_left < obj.x + obj.w and
                         p_right > obj.x and
                         p_top < obj.y + obj.h and
@@ -752,7 +753,7 @@ class Game:
             if new_obj.lane != other.lane:
                 continue
 
-            # collision check
+            # collision check with buffers for each type of objects
             if self.check_collision(new_obj, other):
                 return False
 
@@ -876,7 +877,7 @@ class Game:
             
             new_row = CoinRow(start_x, lane, self, is_air=True)
             
-            # Check against other air coins only (ground coins are far below)
+            # Check against other air coins only
             air_rows = [r for r in self.COIN_ROWS if r.is_air]
             if not self.is_space_free(new_row, air_rows, is_coin_check=True):
                 continue
@@ -890,7 +891,7 @@ class Game:
 
         # check obstacles near player
         for obs in list(self.OBSTACLES):  # iterate copy because may remove
-            # optimize lane check
+            # lane check
             if obs.lane != self.player.current_lane and obs.lane != self.player.target_lane and abs(self.player.target_lane - self.player.current_lane) != 1:
                 continue
             if self.check_player(obs):
@@ -912,7 +913,7 @@ class Game:
                     self.coin_sound.rewind()
                     self.coin_sound.play()
                         
-        # power-ups collection
+        # power-ups collection and removal if off screen
         for pu in list(self.POWER_UPS):            
             if pu.x + pu.w < 0:
                 self.POWER_UPS.remove(pu)
@@ -957,7 +958,7 @@ class Game:
             if air_coin_count < 3:
                 self.spawn_air_coinrow()
         else:
-            # Remove air coin rows when flying ends (optimized)
+            # Remove air coin rows when flying ends
             self.COIN_ROWS = [row for row in self.COIN_ROWS if not row.is_air]
 
     def display(self):
@@ -1173,3 +1174,4 @@ def mousePressed():
         game.power_sound.close()
         game = Game()
         loop()
+
