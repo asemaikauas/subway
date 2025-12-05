@@ -597,7 +597,7 @@ class Game:
 
         # image loads
         
-        jack_img = loadImage(PATH + "/images/last_try.png") 
+        jack_img = loadImage(PATH + "/images/jack.png") 
         background_img = loadImage(PATH + "/images/background.png") 
         bg_city_img = loadImage(PATH + "/images/bg_city.png") 
         lanes_img = loadImage(PATH + "/images/lanes.png") 
@@ -1174,4 +1174,5 @@ def mousePressed():
         game.power_sound.close()
         game = Game()
         loop()
+
 
