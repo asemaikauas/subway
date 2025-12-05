@@ -55,7 +55,7 @@ class AnimationConfig:
 
     SLIDE_DURATION = 70
     RUN_ANIMATION_FRAMES = [0, 1, 2, 3]  # cycle between run1 and run2
-    RUN_ANIMATION_SPEED = 9
+    RUN_ANIMATION_SPEED = 11
     CHARACTER_WIDTH = 60
     CHARACTER_HEIGHT = 60
 
@@ -187,7 +187,7 @@ class Player:
         self.powerup_active = True
         self.JUMP_FORCE = self.SUPER_JUMP_FORCE
         # 8-15 seconds in milliseconds
-        self.powerup_end_time = millis() + 10000 # 10 seconds
+        self.powerup_end_time = millis() + random.randint(8000, 15000) # 10 seconds
     
     def fly(self):
         self.is_flying = True
@@ -962,6 +962,10 @@ class Game:
                 self.POWER_UPS.remove(pu)
                 continue
             
+            # Skip collecting if a power-up is already active
+            if self.player.powerup_active:
+                continue
+            
             if self.check_player(pu):
                 self.power_sound.rewind()
                 self.power_sound.play()
@@ -1044,11 +1048,7 @@ class Game:
             box_x = SCREEN_WIDTH - box_width - 20
             box_y = 15
             
-            # tint to see when the powerup is active
-            if self.player.powerup_active:
-                tint(0, 160, 50)
-            else:
-                noTint()
+            noTint()
             fill(255, 255, 255, 200)
             noStroke()
             rect(box_x, box_y, box_width, box_height, 10)
@@ -1060,6 +1060,28 @@ class Game:
             textSize(24)
             textAlign(LEFT, CENTER)
             text(str(self.score), box_x + 50, box_y + (box_height/2) - 3)
+            
+            # Display power-up countdown timer
+            if self.player.powerup_active:
+                remaining_ms = self.player.powerup_end_time - millis()
+                remaining_seconds = int(remaining_ms / 1000) + 1  # Round up
+                if remaining_seconds > 0:
+                    # Timer box
+                    timer_box_width = 60
+                    timer_box_height = 50
+                    timer_box_x = box_x - timer_box_width - 10
+                    timer_box_y = 15
+                    
+                    # Draw timer background
+                    fill(255, 200, 0, 220)  # Yellow/gold color
+                    noStroke()
+                    rect(timer_box_x, timer_box_y, timer_box_width, timer_box_height, 10)
+                    
+                    # Draw countdown number
+                    fill(0)
+                    textSize(28)
+                    textAlign(CENTER, CENTER)
+                    text(str(remaining_seconds), timer_box_x + timer_box_width/2, timer_box_y + timer_box_height/2)
 
 # global game
 game = None
