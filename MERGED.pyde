@@ -1,26 +1,20 @@
 add_library('minim')
 
-import time
 import os
 import random
 
-
 PATH = os.getcwd()
 player = Minim(this)
-
-
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 LANE_COUNT = 3
 
 PLAYER_X = 250
-
 LANE_POSITIONS_Y_JACK = [
     390,  # up
     518,  # mid
     635   # down
 ]
-
 LANE_POSITIONS_Y = [
     430,  # up
     550,  # mid
@@ -55,12 +49,11 @@ class AnimationConfig:
 
     SLIDE_DURATION = 70
     RUN_ANIMATION_FRAMES = [0, 1, 2, 3]  # cycle between run1 and run2
-    RUN_ANIMATION_SPEED = 11
+    RUN_ANIMATION_SPEED = 9
     CHARACTER_WIDTH = 60
     CHARACTER_HEIGHT = 60
 
 class State:
-    IDLE = "IDLE"
     RUNNING = "RUNNING"
     JUMPING = "JUMPING"
     SLIDING = "SLIDING"
@@ -134,9 +127,7 @@ class Player:
         self.state = new_state
         self.state_timer = 0
 
-        if new_state == State.IDLE:
-            self.current_sprite_index = AnimationConfig.SPRITE_IDLE
-        elif new_state == State.RUNNING:
+        if new_state == State.RUNNING:
             self.current_sprite_index = AnimationConfig.SPRITE_RUN1
             self.run_frame_index = 0
         elif new_state == State.JUMPING:
@@ -206,13 +197,12 @@ class Player:
         # If on train, SKIP the logic that pulls us to the ground lane
         if self.on_train:
             # Check if we ran off the end of the train
-            if getattr(self.game, "last_train", None) is not None:
+            if self.game.last_train is not None:
                 train = self.game.last_train
-                px = self.x
                 buffer = 20
                 
                 # If player X is outside train width
-                if px < train.x - buffer or px > train.x + train.w + buffer:
+                if self.x < train.x - buffer or self.x > train.x + train.w + buffer:
                     self.on_train = False
                     # Reset floor to real ground so we fall
                     self.base_y = LANE_POSITIONS_Y_JACK[self.current_lane]
@@ -232,9 +222,6 @@ class Player:
 
         if self.is_on_ground:
             self.y = self.base_y
-
-    def _update_idle(self):
-        pass
 
     def _update_running(self):
             self.animation_counter += 1
@@ -303,9 +290,8 @@ class Player:
             self.is_on_ground = True
             self.velocity_y = 0
         
-        if self.state == State.IDLE:
-            self._update_idle()
-        elif self.state == State.RUNNING:
+        # Update based on state
+        if self.state == State.RUNNING:
             self._update_running()
         elif self.state == State.JUMPING:
             self._update_jumping()
@@ -315,56 +301,15 @@ class Player:
         if self.is_moving:
             self._update_lane_movement()
 
-    def _update_lane_movement(self):
-        # If on train, SKIP the logic that pulls us to the ground lane
-        if self.on_train:
-            # Check if we ran off the end of the train
-            if getattr(self.game, "last_train", None) is not None:
-                train = self.game.last_train
-                px = self.x
-                buffer = 20
-                
-                # If player X is outside train width
-                if px < train.x - buffer or px > train.x + train.w + buffer:
-                    self.on_train = False
-                    # Reset floor to real ground so we fall
-                    self.base_y = LANE_POSITIONS_Y_JACK[self.current_lane]
-            return 
-
-        # Normal lane switching logic (only runs if NOT on train)
-        target_y = LANE_POSITIONS_Y_JACK[self.target_lane]
-        distance = target_y - self.base_y
-
-        if abs(distance) > 2:
-            self.velocity_x = distance * 0.3
-            self.base_y += self.velocity_x
-        else:
-            self.base_y = target_y
-            self.velocity_x = 0
-            self.current_lane = self.target_lane
-
-        if self.is_on_ground:
-            self.y = self.base_y
-
     def draw(self):
-        # drawing uses CENTER translate style in your engine — leave as-is
         if self.sprite_sheet:
-            sheet_width = self.sprite_sheet.width
-            sheet_height = self.sprite_sheet.height
-
-            if AnimationConfig.SPRITE_COORDINATES is not None:
-                coords = AnimationConfig.SPRITE_COORDINATES[self.current_sprite_index]
-                if len(coords) == 2:
-                    frame_x, frame_width = coords
-                    frame_y = 0
-                    frame_height = sheet_height
-                else:
-                    frame_x, frame_y, frame_width, frame_height = coords
+            coords = AnimationConfig.SPRITE_COORDINATES[self.current_sprite_index]
+            if len(coords) == 4:
+                frame_x, frame_y, frame_width, frame_height = coords
             else:
-                frame_width = sheet_width // 5
-                frame_x = self.current_sprite_index * frame_width
+                frame_x, frame_width = coords
                 frame_y = 0
-                frame_height = sheet_height
+                frame_height = self.sprite_sheet.height
 
             pushMatrix()
             imageMode(CENTER)
@@ -395,6 +340,7 @@ class Player:
             self.target_lane -= 1
         elif direction == "down" and self.target_lane < LANE_COUNT - 1:
             self.target_lane += 1
+            
 
 class Background:
     def __init__(self, background_img, bg_city_img, lanes_img):
@@ -456,6 +402,7 @@ class Background:
                 "x": self.track_segments[-1]["x"] + self.track_segments[-1]["width"],
                 "width": SCREEN_WIDTH
             })
+            
 
     def draw(self):
         background(255)
@@ -675,7 +622,6 @@ class Game:
         self.taken_lanes = set()
 
         self.last_train = None
-        self.powerups_count = 0
         self.last_powerup_time = 0  # Track last powerup spawn/collection time
         self.powerup_cooldown = 20000  # 20 seconds cooldown between power-ups
 
@@ -697,13 +643,16 @@ class Game:
         ]
 
     def check_player(self, obj):
+        # Cache object type to avoid repeated lookups
+        obj_type = obj.type
+        
         # Invincible: skip obstacles but still collect coins
-        if self.player.invincible and obj.type not in ('coin', 'coinrow'):
+        if self.player.invincible and obj_type not in ('coin', 'coinrow'):
             return False
             
         if self.player.is_flying:
             # flying - collect air coins in matching air lane
-            is_valid_air_coin = obj.type in ('coin', 'coinrow') and obj.is_air and obj.lane == self.player.air_lane
+            is_valid_air_coin = obj_type in ('coin', 'coinrow') and obj.is_air and obj.lane == self.player.air_lane
             if not is_valid_air_coin:
                 return False
         else:
@@ -717,20 +666,20 @@ class Game:
         p_bottom = self.player.y + self.player.sprite_height/2 - padding
 
         # coins: collect, but not lethal
-        if getattr(obj, "type", None) in ("coin", "coinrow"):
+        if obj_type in ("coin", "coinrow"):
             return (p_left < obj.x + obj.w and
                     p_right > obj.x and
                     p_top < obj.y + obj.h and
                     p_bottom > obj.y)
         #powerups: collect and use
-        if obj.type in ('flying', 'doublejump'):
+        if obj_type in ('flying', 'doublejump'):
             return (p_left < obj.x + obj.w and
                     p_right > obj.x and
                     p_top < obj.y + obj.h and
                     p_bottom > obj.y)
             
         # trains:
-        if "train" in getattr(obj, "type", ""):
+        if "train" in obj_type:
             feet = p_bottom
             train_top = obj.y
             train_left = obj.x
@@ -1007,32 +956,33 @@ class Game:
             air_coin_count = sum(1 for r in self.COIN_ROWS if r.is_air)
             if air_coin_count < 3:
                 self.spawn_air_coinrow()
-        
-        # Remove air coin rows when flying ends
-        if not self.player.is_flying:
-            for row in list(self.COIN_ROWS):
-                if row.is_air:
-                    self.COIN_ROWS.remove(row)
+        else:
+            # Remove air coin rows when flying ends (optimized)
+            self.COIN_ROWS = [row for row in self.COIN_ROWS if not row.is_air]
 
     def display(self):
         self.background.draw()
         
+        # Draw all coins
         for row in self.COIN_ROWS:
             row.display()
         
-        self.OBSTACLES.sort(key=lambda obj: obj.y)    
-        self.POWER_UPS.sort(key=lambda pu: pu.y)       
+        # Combine and sort objects once (optimized - single sort)
         all_objects = self.POWER_UPS + self.OBSTACLES
+        all_objects.sort(key=lambda obj: obj.y)
         
-        for smth in all_objects:
-            if smth.lane <= self.player.current_lane:
-                smth.display()
+        # Draw objects behind player
+        for obj in all_objects:
+            if obj.lane <= self.player.current_lane:
+                obj.display()
                 
+        # Draw player
         self.player.draw()
         
-        for smth in all_objects:
-            if smth.lane > self.player.current_lane:
-                smth.display()
+        # Draw objects in front of player
+        for obj in all_objects:
+            if obj.lane > self.player.current_lane:
+                obj.display()
             
         
         
@@ -1093,6 +1043,7 @@ class Game:
 
 # global game
 game = None
+game_started = False
 
 def setup():
     global game
@@ -1101,10 +1052,96 @@ def setup():
     game = Game()
 
 def draw():
-    game.update()
-    game.display()
+    global game_started
+    
+    if not game_started:
+        draw_start_screen()
+    else:
+        game.update()
+        game.display()
+
+def draw_start_screen():
+    # draw background layers 
+    game.background.draw()
+    
+    # overlay
+    fill(0, 0, 0, 180)
+    noStroke()
+    rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+    
+    # title
+    fill(255, 215, 0) 
+    textSize(56)
+    textAlign(CENTER, CENTER)
+    text("SUBWAY RUNNER", SCREEN_WIDTH/2, 80)
+    fill(255, 255, 255)
+    textSize(20)
+    text("Welcome to the game of endless run!", SCREEN_WIDTH/2, 150)
+    textSize(16)
+    text("Watch out for obstacles on the tracks, collect power-ups and coins.", SCREEN_WIDTH/2, 190)
+    text("Be careful: the game ends if you run into any obstacle or collide with a train.", SCREEN_WIDTH/2, 215)
+    
+    # Controls 
+    fill(255, 215, 0)
+    textSize(24)
+    text("CONTROLS", SCREEN_WIDTH/2, 270)
+    
+    fill(255, 255, 255)
+    textSize(18)
+    textAlign(LEFT, CENTER)
+    text("UP Arrow", SCREEN_WIDTH/2 - 250, 310)
+    textAlign(LEFT, CENTER)
+    text("Move to the upper lane", SCREEN_WIDTH/2 - 50, 310)
+    
+    text("DOWN Arrow", SCREEN_WIDTH/2 - 250, 345)
+    text("Move to the lower lane", SCREEN_WIDTH/2 - 50, 345)
+    
+    text("SPACE", SCREEN_WIDTH/2 - 250, 380)
+    text("Jump to avoid fences and bushes", SCREEN_WIDTH/2 - 50, 380)
+    
+    text("CTRL", SCREEN_WIDTH/2 - 250, 415)
+    text("Slide under low barriers", SCREEN_WIDTH/2 - 50, 415)
+    
+    # Obstacles 
+    fill(255, 215, 0)
+    textSize(24)
+    textAlign(CENTER, CENTER)
+    text("OBSTACLES", SCREEN_WIDTH/2, 470)
+    
+    fill(255, 255, 255)
+    textSize(18)
+    textAlign(LEFT, CENTER)
+    text("Fences & Bushes", SCREEN_WIDTH/2 - 250, 510)
+    text("Jump over them", SCREEN_WIDTH/2 - 50, 510)
+    
+    text("Slide Barriers", SCREEN_WIDTH/2 - 250, 545)
+    text("Slide underneath", SCREEN_WIDTH/2 - 50, 545)
+    
+    fill(255, 255, 255)
+    textSize(18)
+    textAlign(CENTER, CENTER)
+    text("Good luck and have fun!", SCREEN_WIDTH/2, 595)
+    
+    # Click to Play button
+    button_width = 250
+    button_height = 60
+    button_x = SCREEN_WIDTH/2 - button_width/2
+    button_y = 635
+    
+    fill(255, 215, 0)
+    noStroke()
+    rect(button_x, button_y, button_width, button_height, 15)
+    
+    fill(0)
+    textSize(28)
+    textAlign(CENTER, CENTER)
+    text("CLICK TO PLAY", SCREEN_WIDTH/2, button_y + button_height/2)
 
 def keyPressed():
+    global game_started
+    if not game_started:
+        return
+        
     if key == CODED:
         if keyCode == UP:
             game.player.switch_lane("up")
@@ -1116,8 +1153,20 @@ def keyPressed():
         game.player.jump()
 
 def mousePressed():
-    global game
-    if game.game_over:
+    global game, game_started
+    
+    # start screen check if button clicked
+    if not game_started:
+        button_width = 250
+        button_height = 60
+        button_x = SCREEN_WIDTH/2 - button_width/2
+        button_y = 635
+        
+        if (mouseX >= button_x and mouseX <= button_x + button_width and
+            mouseY >= button_y and mouseY <= button_y + button_height):
+            game_started = True
+    # game over
+    elif game.game_over:
         game.bg_sound.close()
         game.death_sound.close()
         game.coin_sound.close()
