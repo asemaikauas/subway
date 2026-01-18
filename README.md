@@ -5,7 +5,7 @@ The game challenges players to survive as long as possible by dodging obstacles,
 
 ---
 
-## 🎮 Gameplay Overview
+## Gameplay Overview
 
 * The player runs forward on **three subway lanes**
 * Obstacles and collectibles spawn randomly
@@ -15,7 +15,7 @@ The game challenges players to survive as long as possible by dodging obstacles,
 
 ---
 
-## 🕹️ Controls
+## Controls
 
 * **Left / Right** – Switch lanes
 * **Up** – Jump
